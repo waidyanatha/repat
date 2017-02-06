@@ -1,7 +1,8 @@
 # REPAT
-Study of Humanitarian Reporting Patterns (RePat)<br />
+Study of Humanitarian <b>Reporting Patterns</b> (RePat)<br />
+<br />
 This work was carried out pro-bono by<br />
-@authors: Chirag Garg <ilihdian@gmail.com> and Nuwan Waidyanatha <waidyanatha@gmail.com><br />
+<b>@authors</b>: Chirag Garg <ilihdian@gmail.com> and Nuwan Waidyanatha <waidyanatha@gmail.com><br />
 <br />
 Special thanks and acknowledgement: Humanity Road, Kathmandu Living Labs, Statisticians Without Borders, LIRNEasia<br />
 <br />
