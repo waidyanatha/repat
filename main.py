@@ -122,9 +122,17 @@ def drop_cliques_of_size(reduced_df,size=1):
     #
     return reduced_df
 #
-# drop cliques with less than number
-def plot_lat_lon_in_catesian(df):
-#
+# plot the clusters on a map
+def plot_clusters(plot_df):
+    axis_list = ["Latitude","Longitude"]
+    print("starting plot cluster lat/lon on a cartesian plane.")
+    plot.catesian_plane(plot_df, axis_list)
+    print("starting plot cluster lat/lon coordinates on a map plane.")
+    plot.map_points(plot_df, axis_list)
+    print("Completed plotting !")
+    #
+    return 0
+
 #--------------- MAIN CALLS -------------
 # map the inputs to the function blocks
 # check parameters and echo call functionaX
@@ -153,7 +161,7 @@ data_options = {"twitter" : twitter,
 #data = get_clusters(data_options[conf.source]())
 data = pd.DataFrame(get_densities())
 data = drop_cliques_of_size(data, 1)
-plot.in_catesian(data)
+plot_clusters(data)
 #
 #
 #
