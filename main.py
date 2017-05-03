@@ -26,9 +26,15 @@ import config as conf
 import rio
 import cluster
 import plot
+import datetime as dt
+from sklearn.cluster import KMeans
+from pandas.core.series import Series
 
-# 1. get cleaned and formatted data from a source: twitter, facebook, g+, ushahidi,
-# define the function blocks for retieving data filtered by parameters in config.py
+######################################################################################
+#
+# Extract geospatial data from various sources
+#
+######################################################################################
 def twitter():
     df = rio.get_old_tweets(conf.startdate,conf.enddate,conf.search,conf.maximum)
     print("twitter\n")
@@ -40,11 +46,11 @@ def ushahidi():
 def other():
     print ("other\n")
 
-# 2. density-wise cluster the data by time and distances
-# e.g. all data points that are within a 2km redius and a 24 time period
+######################################################################################
+# 
+# Cluster the date set by geographic location and time proximity
 #
-# inputs: den_df is a python pandas dataframe
-#d def density_wise_cluster(cluster_df):
+######################################################################################
 def get_clusters(cluster_df):
     print("starting to cluster the event data ...")
 #        print('{0}\r'.format("trying to cleanup and format all data ...")),
@@ -78,8 +84,11 @@ def get_clusters(cluster_df):
     print("completed writing clustered events data to the CSV file !")
     #
     return cluster_df
+######################################################################################
 #
-# calculate the density of each cluster
+# calculate the density of each cluster based on the Gaussian function
+#
+######################################################################################
 def get_densities():
     print("starting to calculate the density and influencer of each cluster")
     density_df = pd.read_csv('./data/tmp_clustered_outfile.csv',encoding='utf-16',sep='\t')
@@ -107,8 +116,11 @@ def get_densities():
     density_df.to_csv('./data/tmp_density_outfile.csv',encoding='utf-16',sep='\t')
     print("completed writing density for the events data to the CSV file !")
     return density_df
+######################################################################################
 #
-# drop cliques with less than number
+# drop cliques with less than N number of event data in the clique
+#
+######################################################################################
 def drop_cliques_of_size(reduced_df,size=1):
     #
     unique_cl_df = pd.DataFrame(reduced_df['Clique'].unique())
@@ -121,19 +133,94 @@ def drop_cliques_of_size(reduced_df,size=1):
     print("completed writing " + str(len(reduced_df['Clique'].unique())) + " clusters with size greater than "+str(size) + " to the CSV file !")
     #
     return reduced_df
+######################################################################################
 #
-# plot the clusters on a map
+# plot the clusters on maps and cartesian planes
+#
+######################################################################################
 def plot_clusters(plot_df):
+    #
     axis_list = ["Latitude","Longitude"]
-    print("starting plot cluster lat/lon on a cartesian plane.")
-    plot.catesian_plane(plot_df, axis_list)
-    print("starting plot cluster lat/lon coordinates on a map plane.")
-    plot.map_points(plot_df, axis_list)
-    print("Completed plotting !")
+    plot_df = plot_df.loc[plot_df['Clique'] == plot_df['UID']]
+    print plot_df
+
+    # create data-frame with before
+    before_df = pd.DataFrame(plot_df.loc[plot_df['Date'] < conf.event_datetime])
+    print before_df
+    if not before_df.empty:
+        print("starting plot cluster lat/lon data before "+str(conf.event_datetime)+" on a cartesian plane.")
+        title = "Lat vs. Lon plot of clusters before: "+str(conf.event_datetime)
+        plot.catesian_plane(before_df, axis_list, title, "plot_cartesian_plane_before.png")
+        print("starting plot "+ str(len(before_df['Clique'].unique())) +" cluster lat/lon data before "+str(conf.event_datetime)+" on a map.")
+        title = "Map plot of clusters before: "+str(conf.event_datetime)
+        plot.map_points(before_df, axis_list, title, "plot_map_before.png")
+    else:
+        print("No data found before "+str(conf.event_datetime))
+    # create data-frame with after
+    after_df = pd.DataFrame(plot_df.loc[plot_df['Date'] >= conf.event_datetime])
+    if not after_df.empty:
+        print("starting plot "+ str(len(after_df['Clique'].unique())) +" cluster lat/lon data after "+str(conf.event_datetime)+" on a cartesian plane.")
+        title = "Lat vs. Lon plot of clusters after: "+str(conf.event_datetime)
+        plot.catesian_plane(after_df, axis_list, title, "plot_cartesian_plane_after.png")
+        print("starting plot cluster lat/lon coordinates, data after "+str(conf.event_datetime)+" on a map.")
+        title = "Map plot of clusters after: "+str(conf.event_datetime)
+        plot.map_points(after_df, axis_list,title, "plot_map_after.png")
+    else:
+        print("No data found after "+str(conf.event_datetime))
+    # 
+    # REPORTING DELAYS: calculate and plot the delayed reporting time for each cluster on a map
+    # 
+    delay_df = pd.DataFrame(columns=['Clique','Date','Delay', 'Longitude', 'Latitude', 'Color', 'K_means'])
+    after_df = pd.DataFrame(plot_df.loc[plot_df['Date'] >= conf.event_datetime])
+    if not after_df.empty:
+        print("starting plot "+ str(len(after_df['Clique'].unique())) +" cluster reporting delays after "+str(conf.event_datetime)+" on a cartesian plane.")
+        unique_cliques = pd.DataFrame(after_df['Clique'].unique())
+        for row_index, row in unique_cliques.iterrows():
+            # get the clique data points
+            this_clique_df = pd.DataFrame(after_df.loc[after_df.Clique == row[0]])
+            # get the most recent date
+            #smallest_dt = this_clique_df['Date'][this_clique_df['Date'].argmin()]
+            smallest_dt = pd.Timestamp(this_clique_df['Date'].min())
+            event_dt = pd.Timestamp(conf.event_datetime)
+            num_of_hours = float((smallest_dt - event_dt).days)*24 + float((smallest_dt - event_dt).seconds)/(60*60)
+            # retrieve the longitude and latitude
+            lon = float(this_clique_df['Longitude'].loc[this_clique_df['Clique'] == row[0]])
+            lat = float(this_clique_df['Latitude'].loc[this_clique_df['Clique'] == row[0]])
+            # test if number of hours are beyond the maximum period after the hazard event
+            if num_of_hours > conf.maximum_period:
+                index_value = len(delay_df)
+                delay_df.set_value(index_value, 'Clique', row[0])
+                delay_df.set_value(index_value, 'Date', smallest_dt)
+                delay_df.set_value(index_value, 'Delay', num_of_hours)
+                delay_df.set_value(index_value, 'Longitude', lon)
+                delay_df.set_value(index_value, 'Latitude', lat)
+        # k-means clustering of the delays to assign a color
+        km = KMeans(n_clusters=1, random_state=1)
+        km.fit(delay_df['Delay'])
+        predict=km.predict(delay_df['Delay'])
+        delay_df['K_means'] = Series(predict,index=delay_df.index)
+        delay_df['Color'] = Series(predict,index=delay_df.index)
+        # plot delays in a cartesian plane
+        title = "Cluster-wise reporting delays after : "+str(conf.event_datetime)
+        axis_list = ["Date","Delay"]
+        plot.scatter_plane(delay_df, axis_list, title, "plot_cartesian_reporting_delays.png")
+        # plot delays on a map
+#        title = "Map plot of reporting delays after : "+str(conf.event_datetime)
+#        axis_list = axis_list = ["Latitude","Longitude"]
+#        plot.scatter_plane(delay_df, axis_list, title, "plot_map_reporting_delays.png")
+        
+    # calculate and plot the delayed reporting time correlation
+    print("Completed plotting cluster data !")
     #
     return 0
 
-#--------------- MAIN CALLS -------------
+######################################################################################
+#
+#    MAIN CALLS 
+#
+######################################################################################
+tstart = dt.datetime.now()
+print("starting process at "+str(tstart))
 # map the inputs to the function blocks
 # check parameters and echo call functionaX
 logstr = "Data filtering parameters: "
@@ -157,14 +244,13 @@ data_options = {"twitter" : twitter,
            "other" : other,           
 }
 ##data = options[conf.source]()
-#d density_wise_cluster(data_options[conf.source]())
 #data = get_clusters(data_options[conf.source]())
-data = pd.DataFrame(get_densities())
-data = drop_cliques_of_size(data, 1)
+#data = pd.DataFrame(get_densities())
+#data = drop_cliques_of_size(data, 1)
+data = pd.read_csv("./data/tmp_cliques_droppedsize.csv", encoding="utf-16",sep="\t")
 plot_clusters(data)
-#
-#
-#
+tfinish = dt.datetime.now()
+print("ending process at "+str(tfinish)+" with a total time of "+str(tfinish - tstart))
 #
 # 3. compare data in each cluster to compare anormalies user reporting patterns
 # e.g. the behaviour might be to tweet in the evenings on the weekend, then

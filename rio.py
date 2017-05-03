@@ -43,19 +43,14 @@ def cleanup_tweets(file="./data/rawtweets.csv"):
     dftmp = pd.DataFrame(columns=cols)
 
     # Print column headers
-#d    print(data_df)
-    return data_df
+    return dftmp
 
 # main function to call to treieve cleaned up tweets for processing
 # the data will be stored in the CSV specified in the config.py file
 def get_old_tweets(since, until, search, maxtweets):
 
     #download tweets from every user in the same timeframe
-#d    tweetCriteria = got.manager.TweetCriteria().setUsername(user).setSince(since).setUntil(until)
-#d    tweet = got.manager.TweetManager.getTweets(tweetCriteria)[0]
-#d    ex.main(--username "barackobama" --since 2015-09-10 --until 2015-09-12 --querysearch "europe refugees" --maxtweets 1)
     exstr = 'python2 Exporter.py'
-#d    exstr += ' --username ' + '"waidyanatha"'
     if since != "" : exstr += ' --since ' + str(since)
     if until != "" : exstr += ' --until ' + str(until)
     if search != "" : exstr += ' --querysearch ' + str(search)
@@ -63,16 +58,7 @@ def get_old_tweets(since, until, search, maxtweets):
     
 #    os.system(exstr)
 #fix    data_df=pd.read_csv('tmp.csv',encoding='utf-16',sep='\t')
-#d    data_df=pd.read_csv('./exploratory-analysis/newtweets_Nepal11Apr-9thMay_complete.txt',encoding='utf-16',sep='\t')
 #    data_df=pd.read_csv('./nepal.txt',encoding='utf-16',sep='\t')
-    data_df=pd.read_csv('./data/test.txt',encoding='utf-16',sep='\t')
-#d    print(data_df)
-#d    with open('tmp.csv', 'rb') as f:
-#d        data = csv.reader(f, delimiter='\t')
-#d        data = [i.split("\t") for i in f.read().split()]
-#d        print(data)
-#d        cols=['Serial', 'TweetId', 'permalink', 'Username', 'Text', 'Date', 'Retweets', 'Favorites', 'Mentions', 'Hashtags', 'Geo', 'GPS', 'L3', 'L4']
-#d        df = pd.DataFrame(data, columns=cols)
-#d    print(df)
+    data_df=pd.read_csv('./data/test200.txt',encoding='utf-16',sep='\t')
     
     return data_df
