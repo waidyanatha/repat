@@ -29,6 +29,7 @@ import plot
 import datetime as dt
 from sklearn.cluster import KMeans
 from pandas.core.series import Series
+import math
 
 ######################################################################################
 #
@@ -106,7 +107,7 @@ def get_densities():
         # get all the clique specific data
         this_clique_df = pd.DataFrame(density_df.loc[density_df['Clique'] == unique_cl_df[0][i]])
         # calculate the density of the cluster
-        this_clique_df = cluster.calculate_density(this_clique_df)
+        this_clique_df = cluster.calculate_cluster_density(this_clique_df)
         # update the data-frame with the density
         for index, row in this_clique_df.iterrows():
             density_df['Density'][density_df['UID'] == row['UID']] = float(this_clique_df['Density'].unique())
@@ -138,15 +139,13 @@ def drop_cliques_of_size(reduced_df,size=1):
 # plot the clusters on maps and cartesian planes
 #
 ######################################################################################
-def plot_clusters(plot_df):
+def plot_all_clusters_before_after(plot_df):
     #
     axis_list = ["Latitude","Longitude"]
     plot_df = plot_df.loc[plot_df['Clique'] == plot_df['UID']]
-    print plot_df
 
     # create data-frame with before
     before_df = pd.DataFrame(plot_df.loc[plot_df['Date'] < conf.event_datetime])
-    print before_df
     if not before_df.empty:
         print("starting plot cluster lat/lon data before "+str(conf.event_datetime)+" on a cartesian plane.")
         title = "Lat vs. Lon plot of clusters before: "+str(conf.event_datetime)
@@ -167,10 +166,67 @@ def plot_clusters(plot_df):
         plot.map_points(after_df, axis_list,title, "plot_map_after.png")
     else:
         print("No data found after "+str(conf.event_datetime))
-    # 
-    # REPORTING DELAYS: calculate and plot the delayed reporting time for each cluster on a map
-    # 
-    delay_df = pd.DataFrame(columns=['Clique','Date','Delay', 'Longitude', 'Latitude', 'Color', 'K_means'])
+        
+    # calculate and plot the delayed reporting time correlation
+    print("Completed plotting cluster data !")
+    #
+    return 0
+#
+######################################################################################
+#
+# BEFORE AFTER COMPARISON: plot after incident data in the neighborhood of data before 
+# 
+######################################################################################
+#
+def plot_cluster_comparison_before_after(cluster_df):
+    print("Starting process to compare before and after data to assign nearest neighbor cluster")
+    if cluster_df.columns.str.contains('Unnamed:').any():
+        cluster_df = cluster_df[cluster_df.columns[~cluster_df.columns.str.contains('Unnamed:')]]
+    #
+    cluster_df['Neighbor'] = None
+    nearest_neighbors_df = pd.DataFrame(columns=['Clique','Neighbors','Date','Density','Longitude','Latitude'])
+    # separate the data
+    after_df = pd.DataFrame(cluster_df.loc[cluster_df['Date'] >= conf.event_datetime])
+    before_df = pd.DataFrame(cluster_df.loc[cluster_df['Date'] < conf.event_datetime])
+    if after_df.empty or before_df.empty:
+        print("No distinct before and after datasets to assign before cluster neighbors to after clusters")
+        return 0
+    # data available proceed to compute which after clusters intersect with after clusters
+    unique_after_cliques = pd.DataFrame(after_df['Clique'].unique())
+    for row_index, clique_id in unique_after_cliques.iterrows():
+        # get the clique data points
+        this_after_clique = pd.DataFrame(cluster_df.loc[cluster_df['UID'] == clique_id[0]])
+        this_clique_neighbors = cluster.get_nearest_cluster_neighbor(this_after_clique,before_df)
+        if not this_clique_neighbors.empty:
+            for clique_index, clique_row in this_clique_neighbors.iterrows():
+                next_index = len(nearest_neighbors_df)
+                nearest_neighbors_df.set_value(next_index, 'Clique', clique_row['Clique'])
+                nearest_neighbors_df.set_value(next_index, 'Neighbors', clique_row['Neighbors'])
+                nearest_neighbors_df.set_value(next_index, 'Date', clique_row['Date'])
+                nearest_neighbors_df.set_value(next_index, 'Density', clique_row['Density'])
+                nearest_neighbors_df.set_value(next_index, 'Longitude', clique_row['Longitude'])
+                nearest_neighbors_df.set_value(next_index, 'Latitude', clique_row['Latitude'])
+    #
+    #plot the data on a map
+    print("starting plot clusters with data before and after comparison "+str(conf.event_datetime)+" on a map.")
+    axis_list = ["Latitude","Longitude"]
+    title = "Clusters After: "+str(conf.event_datetime+" Nearest to Neighbors Before ")
+    plot.map_points(nearest_neighbors_df, axis_list,title, "plot_map_before_after_comparison.png")
+    #
+    #plot the data in a time series
+    plot.time_series_points(nearest_neighbors_df, axis_list, title, "plot_timeseries_before_after_comparison.png")
+    #
+    print("Completed plotting before and after comparison !")    
+    return 0
+#
+######################################################################################
+#
+# REPORTING DELAYS: calculate and plot the delayed reporting time for each cluster on a map
+# 
+######################################################################################
+#
+def plot_reporting_delays(plot_df):
+    delay_df = pd.DataFrame(columns=['Series','Clique','Date','Delay', 'Density', 'Longitude', 'Latitude', 'K_means'])
     after_df = pd.DataFrame(plot_df.loc[plot_df['Date'] >= conf.event_datetime])
     if not after_df.empty:
         print("starting plot "+ str(len(after_df['Clique'].unique())) +" cluster reporting delays after "+str(conf.event_datetime)+" on a cartesian plane.")
@@ -184,36 +240,53 @@ def plot_clusters(plot_df):
             event_dt = pd.Timestamp(conf.event_datetime)
             num_of_hours = float((smallest_dt - event_dt).days)*24 + float((smallest_dt - event_dt).seconds)/(60*60)
             # retrieve the longitude and latitude
-            lon = float(this_clique_df['Longitude'].loc[this_clique_df['Clique'] == row[0]])
-            lat = float(this_clique_df['Latitude'].loc[this_clique_df['Clique'] == row[0]])
+            den = float(this_clique_df['Density'].loc[this_clique_df['UID'] == row[0]])
+            lon = float(this_clique_df['Longitude'].loc[this_clique_df['UID'] == row[0]])
+            lat = float(this_clique_df['Latitude'].loc[this_clique_df['UID'] == row[0]])
             # test if number of hours are beyond the maximum period after the hazard event
             if num_of_hours > conf.maximum_period:
                 index_value = len(delay_df)
+                delay_df.set_value(index_value, 'Series', int(index_value))
                 delay_df.set_value(index_value, 'Clique', row[0])
                 delay_df.set_value(index_value, 'Date', smallest_dt)
                 delay_df.set_value(index_value, 'Delay', num_of_hours)
                 delay_df.set_value(index_value, 'Longitude', lon)
                 delay_df.set_value(index_value, 'Latitude', lat)
+        # compute the number of clusters 'k' based on 24 hour intervals
+        k = math.ceil((delay_df.loc[:,'Delay'].max() - delay_df.loc[:,'Delay'].min()))
+        # can we divide into 24 hour intervals
+        if k/24 > 1:
+            k = math.floor(k/24)
+        # otherwise set k to be one hour
+        else:
+            k = math.floor(k)
+        # set k to be less than 23 colors
+        if k > 23:
+            k = int(23)
         # k-means clustering of the delays to assign a color
-        km = KMeans(n_clusters=1, random_state=1)
-        km.fit(delay_df['Delay'])
-        predict=km.predict(delay_df['Delay'])
+        X = delay_df[['Delay','Delay']].as_matrix(columns=None)
+        km = KMeans(n_clusters=int(k), init='k-means++', n_init=10, max_iter=300, tol=0.0001, random_state=None, 
+                    precompute_distances='auto', verbose=0, copy_x=True, n_jobs=1, algorithm='auto')
+        km.fit(X)
+        predict=km.predict(X)
         delay_df['K_means'] = Series(predict,index=delay_df.index)
-        delay_df['Color'] = Series(predict,index=delay_df.index)
+#d        delay_df['Color'] = Series(predict,index=delay_df.index)
         # plot delays in a cartesian plane
         title = "Cluster-wise reporting delays after : "+str(conf.event_datetime)
-        axis_list = ["Date","Delay"]
-        plot.scatter_plane(delay_df, axis_list, title, "plot_cartesian_reporting_delays.png")
+        axis_list = ["Series","Delay"]
+        file = "plot_cartesian_reporting_delays.png"
+        plot.scatter_plane(delay_df, axis_list, title, file)
         # plot delays on a map
+        axis_list = ["Longitude","Latitude"]
+        file = "plot_map_reporting_delays.png"
+        plot.scatter_map(delay_df, axis_list, title, file)
+
 #        title = "Map plot of reporting delays after : "+str(conf.event_datetime)
 #        axis_list = axis_list = ["Latitude","Longitude"]
 #        plot.scatter_plane(delay_df, axis_list, title, "plot_map_reporting_delays.png")
-        
-    # calculate and plot the delayed reporting time correlation
-    print("Completed plotting cluster data !")
     #
     return 0
-
+#
 ######################################################################################
 #
 #    MAIN CALLS 
@@ -248,7 +321,9 @@ data_options = {"twitter" : twitter,
 #data = pd.DataFrame(get_densities())
 #data = drop_cliques_of_size(data, 1)
 data = pd.read_csv("./data/tmp_cliques_droppedsize.csv", encoding="utf-16",sep="\t")
-plot_clusters(data)
+#plot_all_clusters_before_after(data)
+#plot_cluster_comparison_before_after(data)
+plot_reporting_delays(data)
 tfinish = dt.datetime.now()
 print("ending process at "+str(tfinish)+" with a total time of "+str(tfinish - tstart))
 #
