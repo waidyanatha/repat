@@ -28,7 +28,7 @@ outfile = "alltweets.csv"
 #
 # set the ISO two letter country code to the data set filter by country 
 country = "np"     #Nepal
-#country = "it"     #Italy
+#country = "it"     # Italy
 #
 # set the start and end (yyyy-mm-dd) to filter the data set by dates
 # when retrieving from the source
@@ -43,7 +43,7 @@ search = "nepal"
 #
 # set the event specific data
 event = "nepal earthquake"
-event_datetime = "4/25/2015 12:00:00"     # date and time the event was recorded
+event_datetime = "4/25/2015 12:00:00"     # m/d/yyyy hh:mm:ss date and time the event was recorded
 location = "Gurkha"         # epicenter of the event
 lattitude = ""              # lat coordinate of the epicenter in decimal form
 longitude = ""              # lon coordinate of the epicenter in decimal form
