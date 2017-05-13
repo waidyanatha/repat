@@ -30,17 +30,52 @@ import datetime as dt
 from sklearn.cluster import KMeans
 from pandas.core.series import Series
 import math
-
+#
+######################################################################################
+#
+# INITIALIZE: set auxiliary directories and paths
+#
+######################################################################################
+def initiatlize():
+    #
+    # plots directory
+    dir_path = "./plots/"
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    # data directory
+    dir_path = "./data/"
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    #
+    # check parameters and echo call functionaX
+    logstr = "Data filtering parameters: \n"
+    if conf.ISO_3166_1_APLPHA_2 != "" : logstr += ' ISO 3166-1 APLPHA-2 = "' + conf.ISO_3166_1_APLPHA_2 + '"\n'
+    #else: logstr += " an unspecified country"
+    if conf.location != "" : logstr += ' Epicenter           = "' + conf.location + '"\n'
+    #else: logstr += " an unspecified location"
+    if conf.startdate != "" : logstr += ' From                = "' + conf.startdate + '"\n'
+    #else: logstr += " an unspecified start date"
+    if conf.enddate != "" : logstr += ' Until               = "' + conf.enddate + '"\n'
+    #else: logstr += " an unspecified end date"
+    if conf.search != "" : logstr += ' Search terms        = "' + conf.search + '"\n'
+    #else: logstr += " an unspecified keywords"
+    if conf.maximum > -1 : logstr += ' Maximum records     = "' + str(conf.maximum) + '"\n'
+    else: logstr += " for all records"
+    print (logstr)
+#
 ######################################################################################
 #
 # Extract geospatial data from various sources
 #
 ######################################################################################
 def twitter():
+    print("retrieving twitter data from http://www.twitter.com")
     df = rio.get_old_tweets(conf.startdate,conf.enddate,conf.search,conf.maximum)
-    print("twitter\n")
+    print("writing twitter data to ./data/"+conf.file_raw_extract_data+" !")
+    df.to_csv("./data/"+conf.file_raw_extract_data,encoding='utf-16',sep='\t')    
+    print("twitter extraction complete!")
     return df
-
+#
 def ushahidi():
     print ("ushahidi\n")
 
@@ -81,8 +116,8 @@ def get_clusters(cluster_df):
     print("Total number of unique cliques clusters generated = " + str(len(cluster_df['Clique'].unique())))
     # write clustered data to CSV file
     print("writing clustered data to a file ./data/tmp_clustered_outfile.csv")
-    cluster_df.to_csv('./data/tmp_clustered_outfile.csv',encoding='utf-16',sep='\t')
-    print("completed writing clustered events data to the CSV file !")
+    cluster_df.to_csv("./data/"+conf.file_clustered_data,encoding='utf-16',sep='\t')
+    print("completed writing clustered events data to  ./data/"+conf.file_clustered_data+" !")
     #
     return cluster_df
 ######################################################################################
@@ -114,8 +149,8 @@ def get_densities():
         #
         i += 1    
     #
-    density_df.to_csv('./data/tmp_density_outfile.csv',encoding='utf-16',sep='\t')
-    print("completed writing density for the events data to the CSV file !")
+    density_df.to_csv("./data/"+conf.file_density_data,encoding='utf-16',sep='\t')
+    print("completed writing density data to  ./data/"+conf.file_density_data+" !")
     return density_df
 ######################################################################################
 #
@@ -130,8 +165,8 @@ def drop_cliques_of_size(reduced_df,size=1):
         if len(reduced_df.loc[reduced_df['Clique'] == row[0]]) <= size:
             reduced_df = reduced_df.drop(reduced_df.loc[reduced_df['Clique'] == row[0]].index)
 #            print("drop len = " + str(len(df.loc[df['Clique'] == row[0]])))
-    reduced_df.to_csv('./data/tmp_cliques_droppedsize.csv',encoding='utf-16',sep='\t')
-    print("completed writing " + str(len(reduced_df['Clique'].unique())) + " clusters with size greater than "+str(size) + " to the CSV file !")
+    reduced_df.to_csv("./data/"+conf.file_no_noise_data,encoding='utf-16',sep='\t')
+    print("completed writing "+str(len(reduced_df['Clique'].unique()))+" clusters with size greater than "+str(size)+" to ./data/"+conf.file_no_noise_data+" !")
     #
     return reduced_df
 ######################################################################################
@@ -280,12 +315,61 @@ def plot_reporting_delays(plot_df):
         axis_list = ["Longitude","Latitude"]
         file = "plot_map_reporting_delays.png"
         plot.scatter_map(delay_df, axis_list, title, file)
-
-#        title = "Map plot of reporting delays after : "+str(conf.event_datetime)
-#        axis_list = axis_list = ["Latitude","Longitude"]
-#        plot.scatter_plane(delay_df, axis_list, title, "plot_map_reporting_delays.png")
     #
     return 0
+#
+######################################################################################
+#
+# REPORTING TIME SERIEs: plot the time series for nearest neighbor geographic clusters
+# 
+######################################################################################
+#
+def plot_nearest_neighbor_timeseries(plot_df):
+    print("starting to build nearest neighbor cluster time series ...")
+    #set the flag to stop the iterations
+    iterations = 0
+    clustering_changed = True
+    while clustering_changed:
+        # reset the changed flag to false
+        clustering_changed = False
+        iterations += 1
+        print("running iteration: " + str(iterations) + ", with " + str(len(plot_df['Clique'].unique())) + " cliques to further optimize.")
+        # cluster the data
+        clustering_changed, plot_df = cluster.build_nearest_neighbor_timeseries(plot_df) 
+    #
+    print("completed clustering the data by geographic distance. ")
+    print("Total number of unique cliques clusters generated = " + str(len(plot_df['Clique'].unique())))
+    # write clustered data to CSV file
+    print("writing clustered data to a file ./data/tmp_clustered_outfile.csv")
+    plot_df.to_csv('./data/tmp_nearest_neighbor_cluster_ts.csv',encoding='utf-16',sep='\t')
+    print("completed writing clustered events data to the CSV file !")
+    #
+    event_dt = pd.Timestamp(conf.event_datetime)
+    unique_cliques = pd.DataFrame(plot_df['Clique'].unique())
+    for row_index, row in unique_cliques.iterrows():
+        # get the clique data points
+        this_clique_df = pd.DataFrame(plot_df.loc[plot_df.Clique == row[0]])
+        this_clique_df['TS'] = None
+        #plot the data on a map
+        print("starting plot time series for cluster "+row[0])
+        axis_list = ["Density","TS"]
+        title = "Time Series for CLuster "+row[0]
+        fname = "plot_timeseries_"+row[0]+".png"
+        #
+        for this_row_index, this_row in this_clique_df.iterrows():
+            #
+            this_dt = pd.Timestamp(this_row['Date'])
+            num_of_hours = float((this_dt - event_dt).days)*24
+            this_clique_df.set_value(this_row_index, 'TS', num_of_hours)
+        #
+        #plot the data in a time series
+        print this_clique_df
+        plot.time_series_points(this_clique_df, axis_list, title, fname)
+    #
+    print("Completed plotting time series data !")    
+
+    #
+    return plot_df
 #
 ######################################################################################
 #
@@ -293,45 +377,36 @@ def plot_reporting_delays(plot_df):
 #
 ######################################################################################
 tstart = dt.datetime.now()
-print("starting process at "+str(tstart))
-# map the inputs to the function blocks
-# check parameters and echo call functionaX
-logstr = "Data filtering parameters: "
-if conf.country != "" : logstr += ' country: "' + conf.country + '"'
-#else: logstr += " an unspecified country"
-if conf.location != "" : logstr += ' location: "' + conf.location + '"'
-#else: logstr += " an unspecified location"
-if conf.startdate != "" : logstr += ' since: "' + conf.startdate + '"'
-#else: logstr += " an unspecified start date"
-if conf.enddate != "" : logstr += ' until: "' + conf.enddate + '"'
-#else: logstr += " an unspecified end date"
-if conf.search != "" : logstr += ' search terms: "' + conf.search + '"'
-#else: logstr += " an unspecified keywords"
-if conf.maximum > -1 : logstr += ' maximum records: "' + str(conf.maximum) + '"'
-else: logstr += " for all records"
-print (logstr)
+print("starting RePat at "+str(tstart))
 #
+print("initializing repat ")
+initiatlize()
 # call the function based on the desired data set
 data_options = {"twitter" : twitter,
            "ushahidi" : ushahidi,
            "other" : other,           
 }
-##data = options[conf.source]()
-#data = get_clusters(data_options[conf.source]())
-#data = pd.DataFrame(get_densities())
-#data = drop_cliques_of_size(data, 1)
-data = pd.read_csv("./data/tmp_cliques_droppedsize.csv", encoding="utf-16",sep="\t")
-#plot_all_clusters_before_after(data)
-#plot_cluster_comparison_before_after(data)
-plot_reporting_delays(data)
+# retrieve the data from defined source
+data = pd.DataFrame(data_options[conf.source]())
+if not data.empty:
+    print("Data retrieved with "+str(len(data))+" - "+conf.source+" records")
+    #d data = get_clusters(data_options[conf.source]())
+    # WARNING: after the twitter data retrieval and cleanup is working remove the below code line to read from file
+    #data=pd.read_csv("./data/"+conf.file_formatted_data,encoding='utf-16',sep='\t')
+    # 
+    #data = pd.DataFrame(get_clusters(data))
+    # WARNING: after the twitter data retrieval and cleanup is working remove the below code line to read from file
+#    data=pd.read_csv("./data/"+conf.file_clustered_data,encoding='utf-16',sep='\t')
+#    data = pd.DataFrame(get_densities())
+#    data = pd.DataFrame(drop_cliques_of_size(data, 1))
+    # WARNING: after the twitter data retrieval and cleanup is working remove the below code line to read from file
+    data = pd.read_csv("./data/"+conf.file_no_noise_data, encoding="utf-16",sep="\t")
+#    plot_all_clusters_before_after(data)
+#    plot_cluster_comparison_before_after(data)
+#    plot_reporting_delays(data)
+    plot_nearest_neighbor_timeseries(data)
+else:
+    print("No data retrieved")
 tfinish = dt.datetime.now()
-print("ending process at "+str(tfinish)+" with a total time of "+str(tfinish - tstart))
+print("ending Repat at "+str(tfinish)+" with a total time of "+str(tfinish - tstart))
 #
-# 3. compare data in each cluster to compare anormalies user reporting patterns
-# e.g. the behaviour might be to tweet in the evenings on the weekend, then
-#      how do the trends in the pre-disaster data differ from the post disaster data
-
-# 4. visually present the data for drawing conclusions or prooving the hypotheses
-# e.g. (a) all the cluster color coded by the earliest report received after the desaster
-#      (b) clusters with a larger number of behavioural anomalies between pre & post
-#      (c) 

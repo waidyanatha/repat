@@ -140,20 +140,13 @@ def poll_this_cliques(polled_cliques_df, old_attractor, new_attractor):
         polled_cliques_df = polled_cliques_df.reset_index(drop=True)
         # since its the first it should be tested
         test_attractor = True
-        
-##D    # first remove the old attractor
-##D    polled_cliques_df = polled_cliques_df.drop(polled_cliques_df.loc[polled_cliques_df['Clique'] == old_attractor[0]].index)
-##D    polled_cliques_df.reset_index(drop=True)
-##D    # now add the new attractor, which might be the same as the old attractor but that's OK
-##D    polled_cliques_df = polled_cliques_df.set_value(len(polled_cliques_df), 'Clique', new_attractor[0])
-    
+    #
     return test_attractor, polled_cliques_df
 #
 # Define a function to remove all symbol characters and replace with a space 
 #
 def build_clusters(df):
     #set the flag to stop the iterations
-#    iterations = 0
     clique_changed = False
     i = 0
     clique_tested_df = pd.DataFrame(columns=["Clique"])
@@ -188,6 +181,7 @@ def build_clusters(df):
                         next_clique_df = set_clique_density_attractor(next_clique_df)
                         # update original data-frame with changes
                         for index, row in next_clique_df.iterrows():
+#d                            df.set_value(df.loc[df['UID'] == row['UID']].index,'Clique',row['Clique'])
                             df['Clique'][df.loc[df['UID'] == row['UID']].index] = row['Clique']
                         #
                         # refresh the next clique in the list with latest clique data
@@ -237,7 +231,8 @@ def build_clusters(df):
                             if this_clique_distance < n_sph_rad and this_clique_distance < next_clique_distance:
                                 clique_changed = True
                                 # change the clique value of the next clique data point to this clique value in main dataframe
-                                next_clique_df['Clique'][j] = this_attractor[0]
+#d                                next_clique_df['Clique'][j] = this_attractor[0]
+                                next_clique_df.set_value(j, 'Clique', this_attractor[0])
 #                                print('{0}\r'.format("Adding data point: "+next_clique_df.iloc[k]['UID']+" from clique: "+next_attractor[0]+" to clique: "+this_attractor[0])),
                                 df.loc[df['UID'] == next_clique_df['UID'][j]] = next_clique_df.loc[next_clique_df.index[k]].values
                         # only has only one data point, then add to the clique
@@ -246,7 +241,8 @@ def build_clusters(df):
                             if this_clique_distance < n_sph_rad:
                                 clique_changed = True
                                 # change the clique value of the next clique data point to this clique value in main dataframe
-                                next_clique_df['Clique'][j] = this_attractor[0]
+                                next_clique_df.set_value(j, 'Clique', this_attractor[0])
+#d                                next_clique_df['Clique'][j] = this_attractor[0]
 #                               print('{0}\r'.format("Adding a single data point clique: "+next_clique_df.iloc[k]['UID']+" to clique: "+this_attractor[0])),
                                 df.loc[df['UID'] == next_clique_df['UID'][j]] = next_clique_df.loc[next_clique_df.index[k]].values
                         # update the next clique to reflect the new changes; 
@@ -261,12 +257,8 @@ def build_clusters(df):
                 j += 1
             #    
         # go to the next event to iterate process again
-#d        else:
-#d            print("skip this new clique "+this_attractor_new+" and old clique "+this_attractor_old)
         i += 1
-#        print("presently generated number of unique cliques = " + str(len(df['Clique'].unique())))
         df.to_csv('./data/tmp_clustered_outfile.csv',encoding='utf-16',sep='\t')
-#    print(str(i) + " events (dataframe records) assigned to distinct cliques !")
     #
     return clique_changed,df
 #
@@ -336,5 +328,122 @@ def get_nearest_cluster_neighbor(this_clique_row, neighbor_df):
             this_clique_neighbors_df.set_value(next_index, 'Longitude', float(this_clique_row.iloc[0]['Longitude']))
             this_clique_neighbors_df.set_value(next_index, 'Latitude', float(this_clique_row.iloc[0]['Latitude']))
     #
-    return this_clique_neighbors_df
-        
+    return this_clique_neighbors_df        
+#
+# Define function to cluster nearest neighbors
+#
+def build_nearest_neighbor_timeseries(df):
+    #
+    print df
+    clique_changed = False
+    i = 0
+    clique_tested_df = pd.DataFrame(columns=["Clique"])
+    while i <= len(df['Clique'].unique())-1:
+        # get all the data belonging to the clique of the i-th record
+        this_clique_df = pd.DataFrame(df.loc[df['Clique'] == df['Clique'][i]])
+        this_attractor_old =  this_clique_df['Clique'].unique()
+        # re-calculate and set the attractor for this clique
+        this_clique_df = set_clique_density_attractor(this_clique_df)
+        this_attractor_new = this_clique_df['Clique'].unique()
+        # update original data-frame with changes
+        for index, row in this_clique_df.iterrows():
+            df['Clique'][df.loc[df['UID'] == row['UID']].index] = row['Clique']
+        # check if this clique attractor is already in the tested list
+        test_this_clique, clique_tested_df = poll_this_cliques(clique_tested_df, this_attractor_old, this_attractor_new)
+        if test_this_clique == True:
+            #
+            print('{0}\r'.format("for i = "+str(i)+" of "+str(len(df['Clique'].unique()))+"  cliques, polling data to pull into clique " + df['Clique'][i])),
+            j = 0
+            next_clique_df = pd.DataFrame()
+            # loop through cliques to lure in other neighborhood events into the i-th clique
+            while j <= len(df['Clique'].unique())-1:
+                # get the j-th clique (only process cliques where i is not equal to j)
+                next_clique_df = df.loc[df['Clique'] == df['Clique'][j]]
+                # skip the rest if i-th and j-th clique are the same
+                if next_clique_df['Clique'].unique().any() != this_clique_df['Clique'].unique().any():
+                    #
+                    k = 0
+                    while k <= len(next_clique_df.index)-1:
+                        # re-assign the clique attractor for the latest clique
+                        # i.e. there might be a better data point to serve as the central point (attractor)
+                        next_clique_df = set_clique_density_attractor(next_clique_df)
+                        # update original data-frame with changes
+                        for index, row in next_clique_df.iterrows():
+                            df['Clique'][df.loc[df['UID'] == row['UID']].index] = row['Clique']
+                        #
+                        # refresh the next clique in the list with latest clique data
+                        next_clique_df = pd.DataFrame()
+                        next_clique_df = df.loc[df['Clique'] == df['Clique'][j]]
+                        #get the attractor UID for the i-th and j-th cliques
+                        next_attractor = next_clique_df['Clique'].unique()
+                        this_attractor = this_clique_df['Clique'].unique()
+                        #
+                        # calculate N-sphere radius for both this event and next event, relative to their
+                        # commonly shared clique attractor. lat1 & lon1 are coordinates of the attractor
+                        # lat2 & lon2 are coordinates of the k-th event in j-th clique (next)
+                        # t1 is the datetime of the k-th event in clique j clique (next)
+                        # t2 is the datetime of the attractor
+                        tmpdf = pd.DataFrame()
+                        tmpdf = this_clique_df.loc[this_clique_df['UID'] == this_attractor[0]]
+                        lat1 = float(tmpdf.iloc[0]['Latitude'])
+                        lon1 = float(tmpdf.iloc[0]['Longitude'])
+                        t1 = tmpdf.iloc[0]['Date']     # have to do it this long way due to various errors
+                        lat2 = float(next_clique_df.iloc[k]['Latitude'])
+                        lon2 = float(next_clique_df.iloc[k]['Longitude'])
+                        t2 = t1
+                        this_clique_distance = vector_distance(lat1, lon1, lat2, lon2, t1, t2)
+                        #
+                        # calculate N-sphere radius for both next event attractor and next event 
+                        # lat1 & lon1 are coordinates of the nuclues
+                        # lat2 & lon2 are coordinates of the k-th event in j-th clique (next)
+                        # t1 is the datetime of the k-th event in clique j clique (next)
+                        # t2 is the datetime of the attractor
+                        tmpdf = pd.DataFrame()
+                        tmpdf = next_clique_df.loc[next_clique_df['UID'] == next_attractor[0]]
+                        lat1 = float(tmpdf.iloc[0]['Latitude'])
+                        lon1 = float(tmpdf.iloc[0]['Longitude'])
+                        t1 = tmpdf.iloc[0]['Date']
+                        lat2 = float(next_clique_df.iloc[k]['Latitude'])
+                        lon2 = float(next_clique_df.iloc[k]['Longitude'])
+                        t2 = t1
+                        next_clique_distance = vector_distance(lat1, lon1, lat2, lon2, t1, t2)
+                        #
+                        # check whether the comparing (next) clique has more than one element
+                        # if it does then compare which is shorter N-sphere radius to this clique attractor
+                        # or N-sphere radius to own clique attractor; to change cliques
+                        # if clique has only one data point then automatically add to this clique
+                        # provided the the N-sphere radius is within the N-sphere radius bound
+                        if len(next_clique_df.index) > 1:
+                            # check if the next data is closer to this clique attractor or not
+                            if this_clique_distance < spatia_distance and this_clique_distance < next_clique_distance:
+                                clique_changed = True
+                                # change the clique value of the next clique data point to this clique value in main dataframe
+                                next_clique_df['Clique'][j] = this_attractor[0]
+#                                print('{0}\r'.format("Adding data point: "+next_clique_df.iloc[k]['UID']+" from clique: "+next_attractor[0]+" to clique: "+this_attractor[0])),
+                                df.loc[df['UID'] == next_clique_df['UID'][j]] = next_clique_df.loc[next_clique_df.index[k]].values
+                        # only has only one data point, then add to the clique
+                        else:
+                            # if and only if N-sphere radius satisfies maximum radius constratint
+                            if this_clique_distance < spatia_distance:
+                                clique_changed = True
+                                # change the clique value of the next clique data point to this clique value in main dataframe
+                                next_clique_df['Clique'][j] = this_attractor[0]
+#                               print('{0}\r'.format("Adding a single data point clique: "+next_clique_df.iloc[k]['UID']+" to clique: "+this_attractor[0])),
+                                df.loc[df['UID'] == next_clique_df['UID'][j]] = next_clique_df.loc[next_clique_df.index[k]].values
+                        # update the next clique to reflect the new changes; 
+                        # especially if k-th element clique was change to this clique
+                        next_clique_df = pd.DataFrame()
+                        next_clique_df = df.loc[df['Clique'] == df['Clique'][j]]
+                        #
+                        # increment k to the next (check if it misses an data record)
+                        k += 1
+                #        
+                # increment j to fetch the next clique
+                j += 1
+            #    
+        # go to the next event to iterate process again
+        i += 1
+        df.to_csv('./data/tmp_nearest_neighbor_cluster_ts.csv',encoding='utf-16',sep='\t')
+    #    
+    
+    return clique_changed, df

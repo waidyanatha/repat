@@ -161,13 +161,13 @@ def map_points(df_map,coord_list=['lat','lon'], title = "map plot", fname="plot_
 def time_series_points(ts_df,ts_axis_list=['y','time'], title = "Time Series", fname="plot_ts_clusters.png"):
     #
     plt.figure()
-    ts_df['Series'] = Series(list(range(len(ts_df))))
-    ts_df.cumsum()
+#    ts_df['Series'] = Series(list(range(len(ts_df))))
+#    ts_df.cumsum()
     #ts_df.plot(x='Series',y='Density')
-    y_list = ts_df['Density'].values
-    x_list = ts_df['Date'].values
+    y_list = ts_df[ts_axis_list[0]].values
+    t_list = ts_df[ts_axis_list[1]].values
     
-    plt.scatter(x_list,y_list,s=300,linewidths=2)
+    plt.scatter(t_list,y_list,s=300,linewidths=2)
     plt.savefig("./plots/"+fname, dpi=300, bbox_inces='tight')
     #
     return 0

@@ -57,7 +57,7 @@ def main(argv):
 				
 		
 #		outputFile = codecs.open("rawtweets.csv", "w+", "utf-8")
-		outputFile = codecs.open("tmp"+conf.outfile, "w+", "utf-8")
+		outputFile = codecs.open(conf.file_raw_extract_data, "w+", "utf-8")
 		
 #		outputFile.write('username;date;retweets;favorites;text;geo;mentions;hashtags;id;permalink')
 		outputFile.write('username\t date\t retweets\t favorites\t text\t geo\t mentions\t hashtags\t id\t permalink')
@@ -69,7 +69,7 @@ def main(argv):
 				outputFile.write(('\n%s\t%s\t%d\t%d\t"%s"\t%s\t%s\t%s\t"%s"\t%s' % (t.username, t.date.strftime("%Y-%m-%d %H:%M"), t.retweets, t.favorites, t.text, t.geo, t.mentions, t.hashtags, t.id, t.permalink)))
 #				outputFile.write(('\n%s;%s;%d;%d;"%s";%s;%s;%s;"%s";%s' % (t.username, t.date.strftime("%Y-%m-%d %H:%M"), t.retweets, t.favorites, t.text, t.geo, t.mentions, t.hashtags, t.id, t.permalink)))
 			outputFile.flush();
-			print 'More %d saved on file...\n' % len(tweets)
+			print("More "+str(len(tweets))+" saved to file " + conf.file_raw_extract_data + " ...")
 		
 		got.manager.TweetManager.getTweets(tweetCriteria, receiveBuffer)
 		
@@ -77,7 +77,7 @@ def main(argv):
 		print 'Arguments parser error, try -h' + arg
 	finally:
 		outputFile.close()
-		print 'Done. Output file generated "tmp'+conf.outfile+'"'
+		print('Done. Output file generated "./data/'+conf.file_raw_extract_data+'"')
 
 if __name__ == '__main__':
 	main(sys.argv[1:])

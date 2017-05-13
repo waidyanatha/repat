@@ -22,12 +22,8 @@ source = "twitter"       # available
 #source = "ushahidi"     # work-in-progress
 #source = "facebook"     # unavailable 
 #
-# indicate the file name you wish to store all the data retrieved from the source
-# the file will be stored in CSV fomat in the folder ./data
-outfile = "alltweets.csv"
-#
-# set the ISO two letter country code to the data set filter by country 
-country = "np"     #Nepal
+# set the ISO 3166-1 ALPHA-2 country code to the data set filter by country 
+ISO_3166_1_APLPHA_2 = "np"     #Nepal
 #country = "it"     # Italy
 #
 # set the start and end (yyyy-mm-dd) to filter the data set by dates
@@ -51,8 +47,38 @@ longitude = ""              # lon coordinate of the epicenter in decimal form
 radius = 400                # radius, in km, of the geographic are to filter source data
 #
 # set the maximum number of records to retrieve
-maximum = -1                # maximum = -1 implies all records
-#maximum = 10000             # will retrieve the top 10,000 records
+#maximum = -1                # maximum = -1 implies all records
+maximum = 100             # will retrieve the top 100 records
+#
+##################################################################################
+#
+# FILES for storing processed data at various stages
+#
+# @instructions:
+#     you may change the files names but the file extensions must be preserved
+#     all data files will be stored in the directory folder: ./data/
+#
+# @purpose:
+#     to be able to start a process at any point in the main.py without to repeat
+#     the previous lengthy process by such as data clustering, extraction, etc 
+#     User may simply comment the function in main.py MAIN CALLS to skip the step
+##################################################################################
+#
+file_raw_extract_data = "tmp_alltweets.csv"
+#file_raw_data_extract = "tmp_allquakemap.csv"
+#
+# other temporary files of the data set at various stages of the processing
+#
+file_formatted_data = "test200.txt"
+#file_clean_data_from_extract = "tmp_clean_quakemap.txt"
+file_clustered_data = "tmp_clustered_tweets.csv"
+#file_clustered_data = "tmp_clustered_quakemap.csv"
+file_no_noise_data = "tmp_no_noise_tweets.csv"
+#file_no_noise_data = "tmp_no_noise_quakemap.csv"
+file_density_data = "tmp_density_tweets.csv"
+#file_density_data = "tmp_density_quakemap.csv"
+file_plotting_data = "tmp_plotting_tweets.csv"
+#file_plotting_data = "tmp_plotting_quakemap.csv"
 #
 ##################################################################################
 #
