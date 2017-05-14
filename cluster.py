@@ -334,7 +334,6 @@ def get_nearest_cluster_neighbor(this_clique_row, neighbor_df):
 #
 def build_nearest_neighbor_timeseries(df):
     #
-    print df
     clique_changed = False
     i = 0
     clique_tested_df = pd.DataFrame(columns=["Clique"])

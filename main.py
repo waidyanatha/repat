@@ -72,6 +72,7 @@ def twitter():
     print("retrieving twitter data from http://www.twitter.com")
     df = rio.get_old_tweets(conf.startdate,conf.enddate,conf.search,conf.maximum)
     print("writing twitter data to ./data/"+conf.file_raw_extract_data+" !")
+    df = df.reset_index(drop=True)
     df.to_csv("./data/"+conf.file_raw_extract_data,encoding='utf-16',sep='\t')    
     print("twitter extraction complete!")
     return df
@@ -90,7 +91,11 @@ def other():
 def get_clusters(cluster_df):
     print("starting to cluster the event data ...")
 #        print('{0}\r'.format("trying to cleanup and format all data ...")),
-    print("trying to cleanup and format all data ...")
+    #
+    if cluster_df.columns.str.contains('Unnamed:').any():
+        cluster_df = cluster_df[cluster_df.columns[~cluster_df.columns.str.contains('Unnamed:')]]
+    #
+    print("first cleanup and format data to stage for clustering ...")
     cluster_df = cluster.clean_data(cluster_df)
     print(str(len(cluster_df.index)-1) + " dataframe records cleaned and formatted !")
     # remove duplicates with identical Serial, Date, Lat, Lon, & Username
@@ -116,6 +121,7 @@ def get_clusters(cluster_df):
     print("Total number of unique cliques clusters generated = " + str(len(cluster_df['Clique'].unique())))
     # write clustered data to CSV file
     print("writing clustered data to a file ./data/tmp_clustered_outfile.csv")
+    cluster_df = cluster_df.reset_index(drop=True)
     cluster_df.to_csv("./data/"+conf.file_clustered_data,encoding='utf-16',sep='\t')
     print("completed writing clustered events data to  ./data/"+conf.file_clustered_data+" !")
     #
@@ -125,11 +131,15 @@ def get_clusters(cluster_df):
 # calculate the density of each cluster based on the Gaussian function
 #
 ######################################################################################
-def get_densities():
+def get_densities(density_df):
+    #
     print("starting to calculate the density and influencer of each cluster")
-    density_df = pd.read_csv('./data/tmp_clustered_outfile.csv',encoding='utf-16',sep='\t')
+    #
+#d    density_df = pd.read_csv('./data/tmp_clustered_outfile.csv',encoding='utf-16',sep='\t')
     # remove the column with label unnamed containing index values from CSV
-    density_df = density_df[density_df.columns[~density_df.columns.str.contains('Unnamed:')]]
+    if density_df.columns.str.contains('Unnamed:').any():
+        density_df = density_df[density_df.columns[~density_df.columns.str.contains('Unnamed:')]]
+    #
     # drop duplicates
     density_df = density_df.drop_duplicates()
     # append the new column : Density
@@ -149,6 +159,7 @@ def get_densities():
         #
         i += 1    
     #
+    density_df = density_df.reset_index(drop=True)
     density_df.to_csv("./data/"+conf.file_density_data,encoding='utf-16',sep='\t')
     print("completed writing density data to  ./data/"+conf.file_density_data+" !")
     return density_df
@@ -159,12 +170,16 @@ def get_densities():
 ######################################################################################
 def drop_cliques_of_size(reduced_df,size=1):
     #
+    if reduced_df.columns.str.contains('Unnamed:').any():
+        reduced_df = reduced_df[reduced_df.columns[~reduced_df.columns.str.contains('Unnamed:')]]
+    #
     unique_cl_df = pd.DataFrame(reduced_df['Clique'].unique())
     print("starting to drop cluster of size "+str(size)+" from set of "+str(len(unique_cl_df.index))+" clusters.")
     for Ind, row in unique_cl_df.iterrows():
         if len(reduced_df.loc[reduced_df['Clique'] == row[0]]) <= size:
             reduced_df = reduced_df.drop(reduced_df.loc[reduced_df['Clique'] == row[0]].index)
 #            print("drop len = " + str(len(df.loc[df['Clique'] == row[0]])))
+    reduced_df = reduced_df.reset_index(drop=True)
     reduced_df.to_csv("./data/"+conf.file_no_noise_data,encoding='utf-16',sep='\t')
     print("completed writing "+str(len(reduced_df['Clique'].unique()))+" clusters with size greater than "+str(size)+" to ./data/"+conf.file_no_noise_data+" !")
     #
@@ -175,6 +190,9 @@ def drop_cliques_of_size(reduced_df,size=1):
 #
 ######################################################################################
 def plot_all_clusters_before_after(plot_df):
+    #
+    if plot_df.columns.str.contains('Unnamed:').any():
+        plot_df = plot_df[plot_df.columns[~plot_df.columns.str.contains('Unnamed:')]]
     #
     axis_list = ["Latitude","Longitude"]
     plot_df = plot_df.loc[plot_df['Clique'] == plot_df['UID']]
@@ -261,6 +279,10 @@ def plot_cluster_comparison_before_after(cluster_df):
 ######################################################################################
 #
 def plot_reporting_delays(plot_df):
+    #
+    if plot_df.columns.str.contains('Unnamed:').any():
+        plot_df = plot_df[plot_df.columns[~plot_df.columns.str.contains('Unnamed:')]]
+    #
     delay_df = pd.DataFrame(columns=['Series','Clique','Date','Delay', 'Density', 'Longitude', 'Latitude', 'K_means'])
     after_df = pd.DataFrame(plot_df.loc[plot_df['Date'] >= conf.event_datetime])
     if not after_df.empty:
@@ -363,13 +385,12 @@ def plot_nearest_neighbor_timeseries(plot_df):
             this_clique_df.set_value(this_row_index, 'TS', num_of_hours)
         #
         #plot the data in a time series
-        print this_clique_df
         plot.time_series_points(this_clique_df, axis_list, title, fname)
     #
     print("Completed plotting time series data !")    
 
     #
-    return plot_df
+    return 0
 #
 ######################################################################################
 #
@@ -390,23 +411,66 @@ data_options = {"twitter" : twitter,
 data = pd.DataFrame(data_options[conf.source]())
 if not data.empty:
     print("Data retrieved with "+str(len(data))+" - "+conf.source+" records")
-    #d data = get_clusters(data_options[conf.source]())
-    # WARNING: after the twitter data retrieval and cleanup is working remove the below code line to read from file
-    #data=pd.read_csv("./data/"+conf.file_formatted_data,encoding='utf-16',sep='\t')
-    # 
-    #data = pd.DataFrame(get_clusters(data))
-    # WARNING: after the twitter data retrieval and cleanup is working remove the below code line to read from file
-#    data=pd.read_csv("./data/"+conf.file_clustered_data,encoding='utf-16',sep='\t')
-#    data = pd.DataFrame(get_densities())
-#    data = pd.DataFrame(drop_cliques_of_size(data, 1))
-    # WARNING: after the twitter data retrieval and cleanup is working remove the below code line to read from file
-    data = pd.read_csv("./data/"+conf.file_no_noise_data, encoding="utf-16",sep="\t")
-#    plot_all_clusters_before_after(data)
-#    plot_cluster_comparison_before_after(data)
-#    plot_reporting_delays(data)
-    plot_nearest_neighbor_timeseries(data)
+#d    data = get_clusters(data_options[conf.source]())
+    #
+    #######################################
+    # CLUSTER THE DATA
+    #######################################
+    # INSTRUCTION: uncomment the below code line only if you want to read from file to reduce time
+    #if not os.path.exists("./data/"+conf.file_formatted_data):
+    #    print("./data/"+conf.file_formatted_data+" does not exist!")
+    #else:
+    #    print("loading formatted data from file to skip retrieving data: ./data/"+conf.file_formatted_data)
+    #    data=pd.read_csv("./data/"+conf.file_formatted_data,encoding='utf-16',sep='\t') 
+    data = pd.DataFrame(get_clusters(data))
+    #
+    #######################################
+    # DENSITY-WISE CLUSTER
+    #######################################
+    # INSTRUCTION: uncomment the below code line only if you want to read from file to reduce time
+    #if not os.path.exists("./data/"+conf.file_clustered_data):
+    #    print("./data/"+conf.file_clustered_data+" does not exist!")
+    #else:
+    #    print("loading clustered data from file to skip process of clustering: ./data/"+conf.file_clustered_data)
+    #    data=pd.read_csv("./data/"+conf.file_clustered_data,encoding='utf-16',sep='\t')
+    if not data.empty:
+        data = pd.DataFrame(get_densities(data))
+    else:
+        print("DataFrame is Empty! cannot continue with density-wise clustering.")
+    #
+    #######################################
+    # REMOVE NOISE DATA
+    #######################################
+    # INSTRUCTION: uncomment the below code line if you want to read from file to reduce time
+    #if not os.path.exists("./data/"+conf.file_density_data):
+    #    print("./data/"+conf.file_density_data+" does not exist!")
+    #else:
+    #    print("loading denisty data from file to skip process of denisty-wise clustering: ./data/"+conf.file_density_data)
+    #    data=pd.read_csv("./data/"+conf.file_density_data,encoding='utf-16',sep='\t')
+    if not data.empty:
+        data = pd.DataFrame(drop_cliques_of_size(data, 1))
+    else:
+        print("DataFrame is Empty! cannot continue with removing noise data.")
+    #
+    #######################################
+    # PLOT THE DATA
+    #######################################
+    # INSTRUCTION: uncomment the below code line only if you want to read from file to reduce time
+    #if not os.path.exists("./data/"+conf.file_no_noise_data):
+    #    print("./data/"+conf.file_no_noise_data+" does not exist!")
+    #else:
+    #    print("loading data without noise from file to skip process of removing noise: ./data/"+conf.file_no_noise_data)
+    #    data = pd.read_csv("./data/"+conf.file_no_noise_data, encoding="utf-16",sep="\t")
+    #
+    if not data.empty:
+        plot_all_clusters_before_after(data)
+        plot_cluster_comparison_before_after(data)
+        plot_reporting_delays(data)
+        plot_nearest_neighbor_timeseries(data)
+    else:
+        print("DataFrame is Empty! cannot continue with plotting.")
 else:
-    print("No data retrieved")
+    print("DataFrame is Empty! no data retrieved; cannot continue repat!")
 tfinish = dt.datetime.now()
 print("ending Repat at "+str(tfinish)+" with a total time of "+str(tfinish - tstart))
 #
